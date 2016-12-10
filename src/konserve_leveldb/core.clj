@@ -1,5 +1,5 @@
 (ns konserve-leveldb.core
-  (:require [clj-leveldb :as level :refer [create-db stats]]
+  (:require [clj-leveldb :as level :refer [create-db]]
             [clojure.core.async :as async :refer [<!! chan close! go put!]]
             [clojure.java.io :as io]
             [hasch.core :refer [uuid]]
@@ -145,7 +145,7 @@
 
   (<!! (k/get-in store ["foo"]))
 
-  <!! (k/exists? store "foos"))
+  (<!! (k/exists? store "foos"))
 
   (<!! (k/assoc-in store ["foo"] {:foo 42}))
 
