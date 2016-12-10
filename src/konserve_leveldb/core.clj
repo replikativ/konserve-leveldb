@@ -1,5 +1,5 @@
 (ns konserve-leveldb.core
-  (:require [clj-leveldb :as level :refer [create-db]]
+  (:require [clj-leveldb :as level :refer [create-db stats]]
             [clojure.core.async :as async :refer [<!! chan close! go put!]]
             [clojure.java.io :as io]
             [hasch.core :refer [uuid]]
@@ -101,8 +101,6 @@
                       :key key
                       :exception e})))))))
 
-
-
 (defn new-leveldb-store
   [path & {:keys [leveldb-opts serializer read-handlers write-handlers]
            :or {serializer (ser/fressian-serializer)
@@ -120,8 +118,14 @@
         (catch Exception e
           e))))
 
-
-
+(defn release [{:keys [ldb] :as store}]
+  (try
+    (do
+      (-> ldb :db .close)
+      true)
+    (catch Exception e
+      e)))
+  
 
 (comment
 
@@ -131,11 +135,17 @@
 
   (get (:ldb store) (str (uuid "foo")))
 
+  (.close (-> store :ldb :db))
+  
+  (-> store :ldb :db (.getProperty "leveldb.stats"))
+
   (:locks store)
+
+  (close-leveldb-store store)
 
   (<!! (k/get-in store ["foo"]))
 
-  (<!! (k/exists? store "foos"))
+  <!! (k/exists? store "foos"))
 
   (<!! (k/assoc-in store ["foo"] {:foo 42}))
 
