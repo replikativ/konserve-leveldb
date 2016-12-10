@@ -135,14 +135,6 @@
 
   (get (:ldb store) (str (uuid "foo")))
 
-  (.close (-> store :ldb :db))
-  
-  (-> store :ldb :db (.getProperty "leveldb.stats"))
-
-  (:locks store)
-
-  (release store)
-
   (<!! (k/get-in store ["foo"]))
 
   (<!! (k/exists? store "foos"))
@@ -158,13 +150,12 @@
 
   (<!! (k/bassoc store ["foo"] (byte-array [42 42 42 42 42])))
 
+  (release store)
 
   (def db (create-db "/tmp/leveldb" {}))
 
   (get db "foo")
 
   (put db "foo" 42)
-
-
 
   )
