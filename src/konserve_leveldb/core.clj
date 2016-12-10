@@ -101,8 +101,6 @@
                       :key key
                       :exception e})))))))
 
-
-
 (defn new-leveldb-store
   [path & {:keys [leveldb-opts serializer read-handlers write-handlers]
            :or {serializer (ser/fressian-serializer)
@@ -120,8 +118,14 @@
         (catch Exception e
           e))))
 
-
-
+(defn release [{:keys [ldb] :as store}]
+  (try
+    (do
+      (-> ldb :db .close)
+      true)
+    (catch Exception e
+      e)))
+  
 
 (comment
 
@@ -130,8 +134,6 @@
   (require '[konserve.core :as k])
 
   (get (:ldb store) (str (uuid "foo")))
-
-  (:locks store)
 
   (<!! (k/get-in store ["foo"]))
 
@@ -148,13 +150,12 @@
 
   (<!! (k/bassoc store ["foo"] (byte-array [42 42 42 42 42])))
 
+  (release store)
 
   (def db (create-db "/tmp/leveldb" {}))
 
   (get db "foo")
 
   (put db "foo" 42)
-
-
 
   )
