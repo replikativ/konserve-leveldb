@@ -141,7 +141,7 @@
 
   (:locks store)
 
-  (close-leveldb-store store)
+  (release store)
 
   (<!! (k/get-in store ["foo"]))
 
