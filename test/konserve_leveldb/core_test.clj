@@ -5,8 +5,8 @@
             [clj-leveldb :as level]
             [clojure.core.async :refer [<!!]]))
 
-(deftest carmine-store-test
-  (testing "Test the carmine store functionality."
+(deftest leveldb-store-test
+  (testing "Test the leveldb store functionality."
     (let [path "/tmp/konserve-leveldb-test"
           _ (level/destroy-db path)
           store (<!! (new-leveldb-store path))]
@@ -20,7 +20,25 @@
              true))
       (is (= (<!! (k/get-in store [:foo]))
              :bar))
+      (<!! (k/dissoc store :foo))
+      (is (= (<!! (k/get-in store [:foo]))
+             nil))
       (<!! (k/bassoc store :binbar (byte-array (range 10))))
       (<!! (k/bget store :binbar (fn [{:keys [input-stream]}]
                                    (is (= (map byte (slurp input-stream))
-                                          (range 10)))))))))
+                                          (range 10))))))
+      (release store))))
+
+
+(comment
+  (def path "/tmp/leveldb-test2")
+
+  (when store
+    (release store))
+  (level/destroy-db path)
+  (def store (<!! (new-leveldb-store path)))
+
+
+
+  (<!! (k/exists? store :foo)))
+

@@ -2,9 +2,11 @@
   (:require [clj-leveldb :as level :refer [create-db]]
             [clojure.core.async :as async :refer [<!! chan close! go put!]]
             [clojure.java.io :as io]
+            [byte-streams :as bs]
             [hasch.core :refer [uuid]]
             [konserve
-             [protocols :refer [-bassoc -bget -deserialize -exists? -get-in -serialize -update-in
+             [protocols :refer [-bassoc -bget -deserialize -exists?
+                                -get-in -serialize -update-in
                                 PBinaryAsyncKeyValueStore PEDNAsyncKeyValueStore]]
              [serializers :as ser]]
             [konserve.core :as k])
@@ -13,10 +15,24 @@
 (defrecord LevelDBStore [ldb serializer read-handlers write-handlers locks]
   PEDNAsyncKeyValueStore
   (-exists? [this key]
-    (let [id (str (uuid key))
-          res (chan)]
-      (put! res (not= (level/get ldb id) nil))
-      (close! res)
+    ;; trick with iterator to not read values
+    (let [res (chan)]
+      (try
+        (let [id (str (uuid key))
+              it (.iterator (:db ldb))
+              _ (.seek it (bs/to-byte-array id))
+              its (String. (.getKey (.next it)))]
+          (.close it)
+          (put! res (= its id)))
+        (catch java.util.NoSuchElementException e
+          (put! res false))
+        (catch Exception e
+          (put! res (ex-info "Could not search for key."
+                             {:type :exist-error
+                              :key key
+                              :exception e})))
+        (finally
+          (close! res)))
       res))
 
 
@@ -29,19 +45,18 @@
         (let [res-ch (chan)]
           (try
             (let [bais (ByteArrayInputStream. val)]
-              (put! res-ch
-                    (get-in
-                     (second (-deserialize serializer read-handlers bais))
-                     rkey)))
-            res-ch
+              (if-let [res (get-in
+                              (second (-deserialize serializer read-handlers bais))
+                              rkey)]
+                (put! res-ch res)))
             (catch Exception e
               (put! res-ch (ex-info "Could not read key."
                                    {:type :read-error
                                     :key fkey
-                                    :exception e}))
-              res-ch)
+                                    :exception e})))
             (finally
-              (close! res-ch)))))))
+              (close! res-ch)))
+          res-ch))))
 
   (-update-in [this key-vec up-fn]
     (let [[fkey & rkey] key-vec
@@ -55,22 +70,33 @@
                 new (if (empty? rkey)
                       (up-fn old)
                       (update-in old rkey up-fn))]
-            (if new
-              (let [baos (ByteArrayOutputStream.)]
-                (-serialize serializer baos write-handlers [key-vec new])
-                (level/put ldb id (.toByteArray baos)))
-              (level/delete ldb id))
+            (let [baos (ByteArrayOutputStream.)]
+              (-serialize serializer baos write-handlers [key-vec new])
+              (level/put ldb id (.toByteArray baos)))
             (put! res-ch [(get-in old rkey)
                           (get-in new rkey)]))
-          res-ch
           (catch Exception e
             (put! res-ch (ex-info "Could not write key."
                                   {:type :write-error
                                    :key fkey
-                                   :exception e}))
-            res-ch)
+                                   :exception e})))
           (finally
-            (close! res-ch))))))
+            (close! res-ch)))
+        res-ch)))
+
+  (-dissoc [this key]
+    (let [id (str (uuid key))
+          res-ch (chan)]
+      (try
+        (level/delete ldb id)
+        (catch Exception e
+          (put! res-ch (ex-info "Could not delete key."
+                                {:type :delete-error
+                                 :key key
+                                 :exception e})))
+        (finally
+          (close! res-ch)))
+      res-ch))
 
   PBinaryAsyncKeyValueStore
   (-bget [this key locked-cb]
@@ -110,7 +136,6 @@
                 write-handlers (atom {})
                 leveldb-opts {}}}]
   (go (try
-        (level/repair-db path)
         (let [db (create-db path leveldb-opts)]
           (map->LevelDBStore {:ldb db
                               :read-handlers read-handlers
@@ -121,7 +146,11 @@
           e))))
 
 
-
+(defn release
+  "Close the underlying LevelDB store. This cleanup is necessary as only one
+  instance of LevelDB is allowed to work on a store at a time."
+  [store]
+  (.close (-> store :ldb :db)))
 
 (comment
 
@@ -135,7 +164,7 @@
 
   (<!! (k/get-in store ["foo"]))
 
-  (<!! (k/exists? store "foos"))
+  (<!! (k/exists? store "foo"))
 
   (<!! (k/assoc-in store ["foo"] {:foo 42}))
 
