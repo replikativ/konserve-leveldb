@@ -26,13 +26,15 @@ store deletion).
   (<!! (k/assoc-in leveldb-store ["john"] 42))
   (<!! (k/update-in leveldb-store ["john"] inc))
   (<!! (k/get-in leveldb-store ["john"]))
+  
+  (<!! (release store)) ;; there is only one instance per store allowed at a time
 ~~~
 
 
 
 ## License
 
-Copyright © 2016 Christian Weilbach
+Copyright © 2016-2017 Christian Weilbach
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
