@@ -1,5 +1,5 @@
 (ns konserve-leveldb.core
-  (:require [clj-leveldb :as level :refer [create-db]]
+  (:require [clj-leveldb :as level :refer [create-db destroy-db]]
             [clojure.core.async :as async :refer [<!! chan close! go put!]]
             [clojure.java.io :as io]
             [byte-streams :as bs]
@@ -84,6 +84,8 @@
             (close! res-ch)))
         res-ch)))
 
+  (-assoc-in [this key-vec val] (-update-in this key-vec (fn [_] val)))
+
   (-dissoc [this key]
     (let [id (str (uuid key))
           res-ch (chan)]
@@ -151,6 +153,11 @@
   instance of LevelDB is allowed to work on a store at a time."
   [store]
   (.close (-> store :ldb :db)))
+
+(defn delete-store
+  "Removes store from disk."
+  [path]
+  (destroy-db path))
 
 (comment
 
