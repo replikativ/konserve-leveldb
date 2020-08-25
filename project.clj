@@ -3,7 +3,7 @@
   :url "http://github.com/replikativ/konserve-leveldb"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.9.0"]
-                 [io.replikativ/konserve "0.5-beta1"]
-                 [byte-streams "0.2.2"]
+  :dependencies [[org.clojure/clojure "1.10.1"]
+                 [io.replikativ/konserve "0.6.0-SNAPSHOT"]
+                 [byte-streams "0.2.4"]
                  [factual/clj-leveldb "0.1.1" :exclusions [byte-streams]]])
